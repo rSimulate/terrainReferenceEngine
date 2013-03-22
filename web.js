@@ -68,8 +68,9 @@ mongo.connect(mongoUri, {}, function(error, db) {
 	// Create a new simulation
 	app.post('/metasim/:version/simulations', function(request, response) {
 		console.log(JSON.stringify(request.body));
-		var simulationUri = url.parse(request.body.simulation_href);
-		var simulationId = simulationUri.pathname.split('/').slice(-1);
+		var simulationUri = request.body.simulation_href;
+		console.log('Got main simulation path: ' + simulationUri);
+		var simulationId = simulationUri.split('/').slice(-1);
 		// Create the simulation object and return it.
 		var simulation = {
 			simulation_href: request.body.simulation_href};
