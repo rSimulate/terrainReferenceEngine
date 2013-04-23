@@ -68,19 +68,59 @@ mongo.connect(mongoUri, {}, function(error, db) {
 	// Create a new simulation
 	app.post('/metasim/:version/simulations', function(request, response) {
 		console.log(JSON.stringify(request.body));
-		var simulationUri = request.body.simulation_href;
-		console.log('Got main simulation path: ' + simulationUri);
-		var simulationId = simulationUri.split('/').slice(-1);
-		// Create the simulation object and return it.
-		var simulation = {
-			simulation_href: request.body.simulation_href};
-		db.collection('simulations').insert(simulation);
-		response.header('Location', url.format({
-			protocol: 'http',
-			hostname: request.host,
-			port: port,
-			pathname: request.originalUrl + '/' + simulationId + '/data.jpg'}));
-		response.send(201, null);
+		var simulationUrl = request.body.simulation_href;
+		console.log('Got main simulation path: ' + simulationUrl);
+        var simulationId = simulationUrl.split('/').slice(-1);
+        // Grab the simulation object from MetaSim
+        // It is already filled out with bodies information`
+
+        // Grab the simulation object from MetaSim
+        http.get(simulationUrl, function(res) {
+            var simulationHref = res.headers.location;
+            console.log('response status: ' + res.status);
+            console.log('response headers: ' + JSON.stringify(res.headers));
+            console.log('Engine simulation created at ' + simulationHref);
+            var body = '';
+            res.on('data', function(chunk) {
+                body += chunk;
+            });
+            res.on('end', function() {
+                // only merge in body if an response was returned
+                if (body != '') {
+                    console.log('got simulation from MetaSim: ' + body);
+                    var simulation = JSON.parse(body);
+                    for(var i in simulation.bodies) {
+                        // add a terrain link for each body
+                        console.log('adding terrain link for body');
+                        dataUrl = simulationHref + '/' + i + '/terrain/data.jpg';
+                        if (simulation.bodies[i].links === undefined) {
+                            simulation.bodies[i].links = [];
+                        }
+                        simulation.bodies[i].links.push({
+                            rel: '/rel/world_texture',
+                            href: dataUrl,
+                            method: 'GET'});
+                        simulation.forwardedPaths.push({
+                            originalUrl: dataUrl, 
+                            dest: url.format({
+                                protocol: 'http',
+                                hostname: request.host,
+                                port: port,
+                                pathname: dataUrl})});
+                        // keep a record of the simulation locally
+		                db.collection('simulations').insert(simulation);
+                        
+		                response.header('Location', url.format({
+		                	protocol: 'http',
+		                	hostname: request.host,
+		                	port: port,
+		                	pathname: request.originalUrl + '/' + simulationId}));
+                        console.log('returning simulation: ' + JSON.stringify(simulation));
+		                response.send(201, simulation);
+                    }
+                }
+            });
+        });
 	});
 
 	// Delete simulations
@@ -102,7 +142,7 @@ mongo.connect(mongoUri, {}, function(error, db) {
 	});
 
 	// Serve up simulation data
-	app.get('/metasim/:version/simulations/:id/data.jpg', function(request, response) {
+	app.get('/metasim/:version/simulations/:id/terrain/data.jpg', function(request, response) {
 		response.sendfile('terrain.jpg');
 	});
 });
