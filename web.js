@@ -69,6 +69,7 @@ mongo.connect(mongoUri, {}, function(error, db) {
 	app.post('/metasim/:version/simulations', function(request, response) {
 		console.log(JSON.stringify(request.body));
 		var simulationUrl = request.body.simulation_href;
+        var simulationPathname = url.parse(simulationUrl).pathname;
 		console.log('Got main simulation path: ' + simulationUrl);
         var simulationId = simulationUrl.split('/').slice(-1);
         // Grab the simulation object from MetaSim
@@ -92,12 +93,16 @@ mongo.connect(mongoUri, {}, function(error, db) {
                     for(var i in simulation.bodies) {
                         // add a terrain link for each body
                         console.log('adding terrain link for body');
-                        dataUrl = simulationHref + '/' + i + '/terrain/data.jpg';
+                        dataUrl = simulationPathname + '/' + i + '/terrain/data.jpg';
                         if (simulation.bodies[i].links === undefined) {
                             simulation.bodies[i].links = [];
                         }
                         simulation.bodies[i].links.push({
                             rel: '/rel/world_texture',
+                            href: dataUrl,
+                            method: 'GET'});
+                        simulation.bodies[i].links.push({
+                            rel: '/rel/world_texture_night',
                             href: dataUrl,
                             method: 'GET'});
                         simulation.forwardedPaths.push({
@@ -142,9 +147,14 @@ mongo.connect(mongoUri, {}, function(error, db) {
 	});
 
 	// Serve up simulation data
-	app.get('/metasim/:version/simulations/:id/terrain/data.jpg', function(request, response) {
+	app.get('/metasim/:version/simulations/:id/:bodyid/terrain/data.jpg', function(request, response) {
 		response.sendfile('terrain.jpg');
 	});
+
+    // default handler
+    app.use(function(request, response) {
+        response.send(404, null);
+    });
 });
 
 app.listen(port, function() {
